@@ -218,6 +218,18 @@ abstraction rather than duplicated.
 ---
 
 ## Failed attempts / findings
-<!-- FILL: e.g. did the transpose column pass actually beat strided at small
-sizes? Did Morton lose? Did fp16 tiling hit bank conflicts? Record the honest
-outcomes here — the brief explicitly values a failed optimisation you can explain. -->
+
+**Boundary stencil bounds the level count.** The 3D round-trip test initially
+failed at `64×32×16`, levels=3 (reconstruction error ~17). Root cause: the
+lifting boundary formula `predict2` reads `s[n2-3]`, which underflows for
+`n2 < 3` — i.e. any transformed dimension below **n=8**. At `64×32×16` the depth
+axis shrinks `16→8→4` over three levels, hitting n=4 and reading out of bounds.
+This is a property of the *provided* transform (the CPU baseline shares it; its
+1D test never goes below n=16), not a 3D-specific bug. Consequence: the valid
+level count is bounded by `min(W,H,D) >> (levels-1) >= 8`. Cube tests (min n=8)
+pass; the 3D test now uses `128×64×32`, whose deepest level `32×16×8` stays in
+range. Fixing it "properly" would mean redefining the boundary handling and
+diverging from the reference oracle — out of scope.
+
+<!-- FILL: also note bench outcomes — did the transpose column pass beat strided,
+did Morton lose, did fp16 win track bandwidth? Record the honest results. -->

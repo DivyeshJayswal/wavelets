@@ -8,6 +8,10 @@
 // driven by looping over the orthogonal slices so the (line_stride, elem_stride)
 // pair is always a real arithmetic stride — the same "sub-region shrinks, full
 // stride stays" discipline as the 2D MRA. MRA recurses into the LLL octant.
+//
+// Constraint (inherited from the lifting scheme's boundary formula, same in 2D):
+// predict2 reads s[n2-3], so every *processed* dimension must stay >= 8. Hence
+// levels is bounded by min(W,H,D) >> (levels-1) >= 8.
 #pragma once
 #include "wavelet2d.cuh"
 

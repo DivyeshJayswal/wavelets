@@ -53,7 +53,10 @@ int main() {
     bool all = true;
     all &= check(8, 8, 8, 1);
     all &= check(32, 32, 32, 2);
-    all &= check(64, 32, 16, 3);  // non-cube
+    // Non-cube, 3 levels. Every processed dim stays >= 8: the boundary stencil
+    // predict2 reads s[n2-3], so n2 >= 3 (n >= 8) is required — the deepest
+    // level here is 32x16x8, within range.
+    all &= check(128, 64, 32, 3);
     printf("%s\n", all ? "ALL PASS" : "FAILURES");
     return all ? 0 : 1;
 }
