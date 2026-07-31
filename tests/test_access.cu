@@ -1,5 +1,3 @@
-// Item 8 validation: the extraction kernel must return exactly the pixels of the
-// requested level-L LL region as they sit in the resident MRA image.
 #include <cmath>
 #include <cstdio>
 #include <vector>
@@ -21,7 +19,6 @@ static bool check(int W, int H, int levels, int level, int x0, int y0, int w, in
 
     mra_forward(d_img, d_scratch, W, H, levels);
 
-    // Reference: full transformed image on host, then crop the same region.
     std::vector<float> full(size_t(W) * H);
     CUDA_CHECK(cudaMemcpy(full.data(), d_img, size_t(W) * H * sizeof(float), cudaMemcpyDeviceToHost));
 
@@ -46,9 +43,9 @@ static bool check(int W, int H, int levels, int level, int x0, int y0, int w, in
 int main() {
     printf("test_access: multi-resolution extraction\n");
     bool all = true;
-    all &= check(256, 256, 3, 3, 0, 0, 32, 32);    // whole coarsest LL band
-    all &= check(256, 256, 3, 1, 10, 20, 50, 40);  // sub-region of level-1 LL
-    all &= check(512, 256, 4, 2, 5, 5, 60, 30);    // non-square, offset region
+    all &= check(256, 256, 3, 3, 0, 0, 32, 32);
+    all &= check(256, 256, 3, 1, 10, 20, 50, 40);
+    all &= check(512, 256, 4, 2, 5, 5, 60, 30);
     printf("%s\n", all ? "ALL PASS" : "FAILURES");
     return all ? 0 : 1;
 }

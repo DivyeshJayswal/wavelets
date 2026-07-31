@@ -1,13 +1,3 @@
-// Item 11: performance study (and the evidence for items 5, 6, 7, 10).
-//
-// Methodology: each configuration is run WARMUP times untimed, then REPS times
-// timed with cudaEvents; we report the mean. "Useful GB/s" models a full-plane
-// pass as one read + one write of the plane (2*W*H*sizeof(T) bytes); it is a
-// throughput proxy, not a hardware counter — treat ratios (before/after) as the
-// signal. Register/shared usage per kernel comes from the --ptxas-options=-v
-// build log (captured in the notebook).
-//
-// Output is copy-paste markdown for report.md.
 #include <cmath>
 #include <cstdio>
 #include <cuda_fp16.h>
@@ -20,7 +10,6 @@
 
 static const int WARMUP = 5, REPS = 30;
 
-// Time a callable (device work on the default stream), returning mean ms.
 template <typename F>
 static float time_ms(F&& fn) {
     cudaEvent_t a, b;
@@ -38,7 +27,6 @@ static float time_ms(F&& fn) {
 
 static float gbps(size_t bytes, float ms) { return bytes / (ms * 1e-3f) / 1e9f; }
 
-// Fresh device plane filled with a deterministic pattern.
 template <typename T>
 static T* make_plane(int W, int H) {
     std::vector<T> h(size_t(W) * H);
@@ -55,7 +43,7 @@ static void mra_table() {
         float* img = make_plane<float>(S, S);
         float* scr; CUDA_CHECK(cudaMalloc(&scr, size_t(S) * S * sizeof(float)));
         float ms = time_ms([&] { mra_forward(img, scr, S, S, 1); });
-        printf("| %d² | %.3f | %.0f |\n", S, ms, (double(S) * S) / (ms * 1e-3) / 1e6);
+        printf("| %d^2 | %.3f | %.0f |\n", S, ms, (double(S) * S) / (ms * 1e-3) / 1e6);
         cudaFree(img); cudaFree(scr);
     }
 }
@@ -70,12 +58,11 @@ static void dtype_table() {
         __half* hs; CUDA_CHECK(cudaMalloc(&hs, size_t(S) * S * sizeof(__half)));
         float mf = time_ms([&] { mra_forward(f, fs, S, S, 3); });
         float mh = time_ms([&] { mra_forward(h, hs, S, S, 3); });
-        printf("| %d² | %.3f | %.3f | %.2fx |\n", S, mf, mh, mf / mh);
+        printf("| %d^2 | %.3f | %.3f | %.2fx |\n", S, mf, mh, mf / mh);
         cudaFree(f); cudaFree(fs); cudaFree(h); cudaFree(hs);
     }
 }
 
-// Confirm the transpose column pass matches the naive one on the same input.
 static void column_correctness(int S) {
     size_t n = size_t(S) * S;
     std::vector<float> h(n);
@@ -96,7 +83,7 @@ static void column_correctness(int S) {
     CUDA_CHECK(cudaDeviceSynchronize());
     float m = 0.f;
     for (size_t i = 0; i < n; i++) m = fmaxf(m, fabsf(ha[i] - hb[i]));
-    printf("_naive vs transpose max diff at %d² = %.2e (%s)_\n\n", S, m,
+    printf("_naive vs transpose max diff at %d^2 = %.2e (%s)_\n\n", S, m,
            m < 1e-3f ? "match" : "MISMATCH");
     cudaFree(a); cudaFree(b); cudaFree(scr); cudaFree(tb); cudaFree(ts);
 }
@@ -114,7 +101,7 @@ static void column_table() {
         CUDA_CHECK(cudaMalloc(&ts, size_t(S) * S * sizeof(float)));
         float mn = time_ms([&] { column_pass_naive(img, scr, S, S); });
         float mt = time_ms([&] { column_pass_transpose(img, tb, ts, S, S); });
-        printf("| %d² | %.3f | %.1f | %.3f | %.1f | %.2fx |\n", S, mn,
+        printf("| %d^2 | %.3f | %.1f | %.3f | %.1f | %.2fx |\n", S, mn,
                gbps(bytes, mn), mt, gbps(bytes, mt), mn / mt);
         cudaFree(img); cudaFree(scr); cudaFree(tb); cudaFree(ts);
     }
@@ -128,21 +115,18 @@ static void tiled_table() {
         size_t bytes = 2ull * S * S * sizeof(float);
         float *img = make_plane<float>(S, S), *scr;
         CUDA_CHECK(cudaMalloc(&scr, size_t(S) * S * sizeof(float)));
-        float mb = time_ms([&] { pass_forward(img, scr, S, S, S, 1); });  // rows
-        // shared path may be unavailable if a row exceeds shared memory.
+        float mb = time_ms([&] { pass_forward(img, scr, S, S, S, 1); });
+
         bool avail = row_forward_shared(img, S, S);
         cudaDeviceSynchronize();
-        if (!avail) { printf("| %d² | %.3f | %.1f | n/a (row > smem) | | |\n", S, mb, gbps(bytes, mb)); cudaFree(img); cudaFree(scr); continue; }
+        if (!avail) { printf("| %d^2 | %.3f | %.1f | n/a (row > smem) | | |\n", S, mb, gbps(bytes, mb)); cudaFree(img); cudaFree(scr); continue; }
         float ms = time_ms([&] { row_forward_shared(img, S, S); });
-        printf("| %d² | %.3f | %.1f | %.3f | %.1f | %.2fx |\n", S, mb,
+        printf("| %d^2 | %.3f | %.1f | %.3f | %.1f | %.2fx |\n", S, mb,
                gbps(bytes, mb), ms, gbps(bytes, ms), mb / ms);
         cudaFree(img); cudaFree(scr);
     }
 }
 
-// Vertical-neighbour stencil: out(x,y) = in(x,y) + in(x,y+1). This is the
-// layout-sensitive access (adjacent rows) that hurts row-major and is where
-// Morton's 2D locality could help. Both kernels do identical arithmetic.
 __global__ void k_stencil_rowmajor(const float* in, float* out, int W, int H) {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
@@ -165,7 +149,7 @@ __global__ void k_to_morton(const float* in, float* m, int W, int H) {
 static void morton_table() {
     printf("\n### Layout: row-major vs Morton for a vertical-neighbour stencil (item 5)\n\n");
     printf("| Size | row-major (ms) | Morton (ms) | speedup |\n|---|---|---|---|\n");
-    for (int S : {512, 1024, 2048, 4096}) {  // powers of two: exact Morton tiling
+    for (int S : {512, 1024, 2048, 4096}) {
         size_t n = size_t(S) * S;
         float *in = make_plane<float>(S, S), *out, *m;
         CUDA_CHECK(cudaMalloc(&out, n * sizeof(float)));
@@ -174,7 +158,7 @@ static void morton_table() {
         k_to_morton<<<grid, blk>>>(in, m, S, S);
         float mr = time_ms([&] { k_stencil_rowmajor<<<grid, blk>>>(in, out, S, S); });
         float mm = time_ms([&] { k_stencil_morton<<<grid, blk>>>(m, out, S, S); });
-        printf("| %d² | %.4f | %.4f | %.2fx |\n", S, mr, mm, mr / mm);
+        printf("| %d^2 | %.4f | %.4f | %.2fx |\n", S, mr, mm, mr / mm);
         cudaFree(in); cudaFree(out); cudaFree(m);
     }
 }

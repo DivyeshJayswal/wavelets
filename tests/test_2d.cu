@@ -1,11 +1,9 @@
-// Items 2 & 3 validation: 2D separable transform and multi-level MRA must
-// round-trip within tolerance, with no NaNs, across sizes and level counts.
 #include <cmath>
 #include <cstdio>
 #include <vector>
 
 #include "wavelet2d.cuh"
-#include "wavelet_cpu.hpp"  // WAVELET_RECON_TOL
+#include "wavelet_cpu.hpp"
 
 static bool finite_all(const std::vector<float>& v) {
     for (float x : v) if (!std::isfinite(x)) return false;
@@ -18,7 +16,6 @@ static float max_abs_diff(const std::vector<float>& a, const std::vector<float>&
     return m;
 }
 
-// Forward `levels` then inverse `levels`; check reconstruction of a W x H image.
 static bool check(int W, int H, int levels) {
     std::vector<float> orig(W * H);
     for (int y = 0; y < H; y++)
@@ -49,10 +46,10 @@ static bool check(int W, int H, int levels) {
 int main() {
     printf("test_2d: MRA round-trip (tol=%.0e)\n", WAVELET_RECON_TOL);
     bool all = true;
-    all &= check(8, 8, 1);        // smallest separable case
+    all &= check(8, 8, 1);
     all &= check(64, 64, 1);
     all &= check(256, 256, 3);
-    all &= check(512, 256, 4);    // non-square
+    all &= check(512, 256, 4);
     all &= check(1024, 1024, 5);
     printf("%s\n", all ? "ALL PASS" : "FAILURES");
     return all ? 0 : 1;

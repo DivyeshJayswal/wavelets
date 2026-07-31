@@ -11,7 +11,7 @@
 \begin{document}
 
 \begin{center}
-  {\LARGE \textbf{Project Option — GPU Wavelets (JPEG2000-style MRA)}}\\[0.25em]
+  {\LARGE \textbf{Project Option -- GPU Wavelets (JPEG2000-style MRA)}}\\[0.25em]
   \small GPU Computing (Master), bonus project
 \end{center}
 
@@ -36,12 +36,11 @@ One such property is the ability to perform multi-resolution analysis (MRA), whi
     \includegraphics[width=0.4\textwidth]{assets/Castle_Lichtenstein_MRA.png} \\
     (a) Original image & (b) Multi-resolution representation (MRA)
   \end{tabular}
-  \caption{(a) Original image and (b) its multi-resolution representation via wavelets. 
-  By applying the same transform recursively (MRA), we obtain a hierarchical decomposition 
+  \caption{(a) Original image and (b) its multi-resolution representation via wavelets.
+  By applying the same transform recursively (MRA), we obtain a hierarchical decomposition
   of the image into different frequency subbands at multiple scales.}
   \label{fig:mra_example}
 \end{figure}
-
 
 In Figure~\ref{fig:mra_example}, we see an example of an image and its MRA representation obtained via separable wavelets.
 To obtain this image, we can apply the following steps:
@@ -83,72 +82,58 @@ g++ -O2 1D_wavelets.cpp -o wavelet1D
 
 \begin{enumerate}[leftmargin=1.5em]
 
-  % 1D correctness
   \item \term{1D on GPU (FWD+INV)} (\textbf{10 pts}).\\
-  Implement forward and inverse transforms in 1D on the GPU.  
+  Implement forward and inverse transforms in 1D on the GPU.
   Validate against the CPU baseline for multiple signal sizes.
 
-  % 2D extension
   \item \term{2D separable transform} (\textbf{10 pts}).\\
-  Implement 2D forward and inverse transforms via separable row/column passes.  
+  Implement 2D forward and inverse transforms via separable row/column passes.
   Validate perfect reconstruction on a small synthetic image.
 
-  % Multi-level
   \item \term{Multi-Resolution Analysis (MRA)} (\textbf{15 pts}).\\
   Recursively process the \textsf{LL} band.
   The process should still yield perfect reconstruction: applying $N$ levels of FWD followed by $N$ levels of INV returns the original image.
   Beware of changing indexing and strides when jumping to deeper levels.
 
-  % I/O
   \item \term{Image I/O} (\textbf{5 pts}).\\
   Load/save images (e.g., PNG, PGM, custom format, etc.).
   Use external libraries if needed (e.g., stb\_image.h).
 
-  % Discussion on layout
   \item \term{Data layout} (\textbf{10 pts}).\\
   Maybe the default row-major layout is not ideal for multi-level MRA.
   Discuss alternatives (e.g., Morton order, tiled layout), (eventually) implement different ones, and compare performance.
   Finding a clear winner is not expected, but a good discussion is.
 
-  % Coalescing
   \item \term{Coalesced row/column passes} (\textbf{10 pts}).\\
-  Ensure row passes use coalesced memory.  
+  Ensure row passes use coalesced memory.
   For column passes, avoid naive strided loads (e.g., tiled transpose or shared memory buffering).
   Show a bandwidth comparison (before/after).
 
-  % Shared memory
   \item \term{Shared-memory tiling} (\textbf{15 pts}).\\
   Use shared-memory tiles to perform wavelet transforms within each tile.
   The overall result should not necessarily be the same (tricky to do because of boundaries); the goal is rather to reduce global memory traffic and see if performance improves.
 
-  % Multi-resolution access
   \item \term{Multi-resolution access kernel} (\textbf{20 pts}).\\
   One of the benefits of MRA is efficient access to different resolutions.
   For instance, when analyzing a zoomed-out view of a gigantic image, it is more reasonable to access only the coarsest levels of the MRA pyramid.
   Assuming all the MRA-related data are resident on the GPU, implement a kernel that extracts a given part at a given resolution level and sends it back to the host.
 
-  % 3D 
   \item \term{3D extension} (\textbf{10 pts}).\\
   Extend your implementation to 3D data (e.g., volumetric images).
 
-  % Mixed precision
   \item \term{FP16 path} (\textbf{5 pts}).\\
   Support FP16 inputs/outputs and do the transform in FP16 with reasonable performace (beware bank conflicts, etc.).
 
-  % Perf + roofline
   \item \term{Performance study} (\textbf{10 pts}).\\
   Present bandwidth, occupancy, register count, and limiting factors in different configurations (image sizes, levels, data types).
   Optionally, present a roofline analysis.
 
-  % CI
   \item \term{CI + reproducibility} (\textbf{10 pts}).\\
   Provide a simple CI setup that builds the project and runs small deterministic tests (e.g., 1D and 2D transforms on tiny signals/images), checking basic invariants (no NaNs, near-perfect reconstruction).
 
-  % CLI
   \item \term{Command-line interface (CLI)} (\textbf{5 pts}).\\
   Provide a simple CLI to specify input/output files, number of levels, data type, and other parameters.
 
-  % Code quality
   \item \term{Code quality \& tests} (\textbf{10 pts}).\\
   Provide unit tests on different cases/sizes.
   Keep kernels and host code modular and documented.

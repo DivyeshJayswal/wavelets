@@ -1,9 +1,3 @@
-// Item 10 validation: the FP16 MRA path runs and roughly reconstructs.
-//
-// fp16 has ~3 decimal digits, so round-trip error is orders of magnitude larger
-// than the fp32 tolerance — this test asserts no NaNs/Infs and a loose bound,
-// demonstrating the transform works end-to-end in half precision. The report
-// discusses the accuracy loss quantitatively.
 #include <cmath>
 #include <cstdio>
 #include <cuda_fp16.h>
@@ -11,7 +5,7 @@
 
 #include "wavelet2d.cuh"
 
-static const float FP16_TOL = 5.0f;  // loose: fp16 accumulates lifting error
+static const float FP16_TOL = 5.0f;
 
 static bool check(int W, int H, int levels) {
     std::vector<float> orig(size_t(W) * H);

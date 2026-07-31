@@ -1,24 +1,6 @@
-// Items 2 & 3: separable 2D transform and multi-level MRA.
-//
-// The image is row-major, width W (= row stride), height H, resident on the GPU.
-// A 2D level transforms a top-left sub-image of size (lw x lh):
-//   - row pass:    for each of the lh rows, a 1D transform of length lw, stride 1
-//   - column pass: for each of the lw cols, a 1D transform of length lh, stride W
-// After a level, LL occupies the top-left (lw/2 x lh/2); MRA recurses there while
-// keeping the FULL image stride W. Getting stride vs. sub-width right is the classic
-// MRA bug the assignment warns about — the sub-image shrinks, the stride never does.
 #pragma once
 #include "wavelet_gpu.cuh"
 
-// One CUDA block per line keeps launches simple; each block transforms one
-// row (or column) by calling the strided step kernels. To avoid launching
-// kernels-in-a-loop from the host per line (huge launch overhead), we launch
-// each STEP once over all lines: a 2D grid where y selects the line.
-
-// Step wrappers operating on all `lines` signals at once. `line_stride` is the
-// gap between consecutive signals' base pointers; `elem_stride` is within a signal.
-//   Row pass:    lines=lh, line_stride=W,  elem_stride=1
-//   Column pass: lines=lw, line_stride=1,  elem_stride=W
 template <typename T>
 __global__ void k2_deinterleave(const T* src, T* dst, int n2, int lines,
                                 int line_stride, int elem_stride) {
@@ -52,7 +34,6 @@ __global__ void k2_copy(const T* src, T* dst, int n, int lines,
     dst[L * line_stride + i * elem_stride] = src[L * line_stride + i * elem_stride];
 }
 
-// Macro to stamp out the per-step kernels that share the same signature.
 #define WAVE2D_STEP(NAME, BODY)                                                    \
     template <typename T>                                                          \
     __global__ void NAME(T* base, int n2, int lines, int line_stride,              \
@@ -71,7 +52,6 @@ WAVE2D_STEP(k2_fwd_update, { s[k * e] += d[k * e] / T(2); })
 WAVE2D_STEP(k2_inv_update, { s[k * e] -= d[k * e] / T(2); })
 WAVE2D_STEP(k2_inv_predict1, { d[k * e] += s[k * e]; })
 
-// predict2 has edge cases, written out (fwd and inv differ only in sign).
 WAVE2D_STEP(k2_fwd_predict2, {
     if (k == 0)
         d[0] += T(0.75) * s[0] - T(1.0) * s[e] + T(0.25) * s[2 * e];
@@ -96,7 +76,6 @@ static inline dim3 grid2(int nx, int lines, dim3 blk) {
     return dim3((nx + blk.x - 1) / blk.x, (lines + blk.y - 1) / blk.y);
 }
 
-// One separable pass over `lines` signals of length n (n even).
 template <typename T>
 void pass_forward(T* base, T* scratch, int n, int lines, int line_stride,
                   int elem_stride, cudaStream_t st = 0) {
@@ -123,21 +102,18 @@ void pass_inverse(T* base, T* scratch, int n, int lines, int line_stride,
     k2_copy<T><<<gf, blk, 0, st>>>(scratch, base, n, lines, line_stride, elem_stride);
 }
 
-// One 2D level on the top-left (lw x lh) sub-image of a width-W image.
 template <typename T>
 void level_forward(T* img, T* scratch, int lw, int lh, int W, cudaStream_t st = 0) {
-    pass_forward(img, scratch, lw, lh, /*line_stride=*/W, /*elem_stride=*/1, st); // rows
-    pass_forward(img, scratch, lh, lw, /*line_stride=*/1, /*elem_stride=*/W, st); // cols
+    pass_forward(img, scratch, lw, lh, W, 1, st);
+    pass_forward(img, scratch, lh, lw, 1, W, st);
 }
 
 template <typename T>
 void level_inverse(T* img, T* scratch, int lw, int lh, int W, cudaStream_t st = 0) {
-    pass_inverse(img, scratch, lh, lw, /*line_stride=*/1, /*elem_stride=*/W, st); // cols first
-    pass_inverse(img, scratch, lw, lh, /*line_stride=*/W, /*elem_stride=*/1, st); // then rows
+    pass_inverse(img, scratch, lh, lw, 1, W, st);
+    pass_inverse(img, scratch, lw, lh, W, 1, st);
 }
 
-// Multi-level MRA: `levels` forward levels, each recursing into the LL corner.
-// Requires W and H divisible by 2^levels (caller enforces / pads).
 template <typename T>
 void mra_forward(T* img, T* scratch, int W, int H, int levels, cudaStream_t st = 0) {
     int lw = W, lh = H;
@@ -150,7 +126,7 @@ void mra_forward(T* img, T* scratch, int W, int H, int levels, cudaStream_t st =
 
 template <typename T>
 void mra_inverse(T* img, T* scratch, int W, int H, int levels, cudaStream_t st = 0) {
-    // Undo in reverse: start at the coarsest level and grow back out.
+
     for (int l = levels - 1; l >= 0; l--) {
         int lw = W >> l, lh = H >> l;
         level_inverse(img, scratch, lw, lh, W, st);

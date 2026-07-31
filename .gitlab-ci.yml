@@ -1,14 +1,3 @@
-# Item 12: CI + reproducibility.
-#
-# The build stage compiles everything on a stock CUDA devel image and needs no
-# GPU (nvcc compiles device code without a device present). This alone catches
-# compile/regression breakage on every push.
-#
-# The test stage actually runs the deterministic ctest suite (1D/2D/MRA/3D/
-# fp16/io: no NaNs, near-perfect reconstruction). It requires a runner with a
-# GPU, tagged `gpu`. If your GitLab instance has no GPU runner, this stage is
-# skipped (allow_failure) — reproduce it instead via wavelets_colab.ipynb.
-
 stages: [build, test]
 
 variables:
@@ -29,9 +18,9 @@ build:
 test:gpu:
   stage: test
   image: $CUDA_IMAGE
-  tags: [gpu]           # requires a GPU-equipped runner
+  tags: [gpu]
   needs: [build]
-  allow_failure: true   # skipped gracefully if no GPU runner is available
+  allow_failure: true
   before_script:
     - apt-get update -qq && apt-get install -y -qq cmake >/dev/null
   script:
