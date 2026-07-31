@@ -3,3 +3,12 @@ wavelets_project.zip
 bench_results.md
 *.o
 *.obj
+
+Wavelets.pdf
+wavelets.tex
+common_guidelines.tex
+assets/MarchingCubesCases.png
+assets/Castle_Lichtenstein_MRA.png
+wavelets/1D_wavelets.cpp
+report.md
+wavelets_colab.ipynb
