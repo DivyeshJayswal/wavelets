@@ -1,14 +1,3 @@
-// Item 13: command-line driver. Item 4/10 exercised end-to-end.
-//
-//   wavelet --input in.png --output out.png [--levels N] [--dtype fp32|fp16]
-//           [--forward]
-//
-// Default mode is a round-trip (forward then inverse) that writes the
-// reconstruction and prints the max error vs the input — the honest proof of
-// perfect reconstruction on a real image. --forward instead writes the MRA
-// coefficient image (the Figure-1b-style multi-resolution representation).
-//
-// This is the one translation unit that pulls in the stb implementation.
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 
@@ -23,13 +12,11 @@
 #include "image_io.hpp"
 #include "wavelet2d.cuh"
 
-// Smallest multiple of 2^levels that is >= n (mra_forward needs W,H divisible).
 static int pad_to(int n, int levels) {
     int m = 1 << levels;
     return ((n + m - 1) / m) * m;
 }
 
-// Edge-replicate `src` (sw x sh) into a (dw x dh) top-left buffer.
 static std::vector<float> pad_image(const Image& src, int dw, int dh) {
     std::vector<float> out(size_t(dw) * dh);
     for (int y = 0; y < dh; y++) {
@@ -42,7 +29,6 @@ static std::vector<float> pad_image(const Image& src, int dw, int dh) {
     return out;
 }
 
-// Crop a (dw x _) buffer back to (w x h) top-left.
 static std::vector<float> crop_image(const std::vector<float>& in, int dw, int w, int h) {
     std::vector<float> out(size_t(w) * h);
     for (int y = 0; y < h; y++)
@@ -50,8 +36,6 @@ static std::vector<float> crop_image(const std::vector<float>& in, int dw, int w
     return out;
 }
 
-// Run the MRA on the padded plane in precision T (float or __half), in place.
-// Host floats are converted to T, transformed on the GPU, and converted back.
 template <typename T>
 static void run_gpu(std::vector<float>& plane, int W, int H, int levels, bool forward_only) {
     const size_t n = size_t(W) * H;
@@ -115,9 +99,21 @@ int main(int argc, char** argv) {
             run_gpu<float>(plane, W, H, levels, forward_only);
 
         if (forward_only) {
-            // Save the full MRA coefficient plane (clamped) as the representation.
-            save_gray(out, plane, W, H);
-            printf("wrote MRA coefficients %dx%d (levels=%d, %s) -> %s\n", W, H,
+            // Display transform: show the coarsest LL corner as-is (an
+            // approximation image), and amplify |detail| elsewhere so the
+            // near-zero sub-bands become visible. Coefficients are unchanged;
+            // this only affects the saved picture.
+            const int llw = W >> levels, llh = H >> levels;
+            const float gain = 4.f;
+            std::vector<float> viz(plane.size());
+            for (int y = 0; y < H; y++)
+                for (int x = 0; x < W; x++) {
+                    float c = plane[size_t(y) * W + x];
+                    bool ll = (x < llw && y < llh);
+                    viz[size_t(y) * W + x] = ll ? c : std::fabs(c) * gain;
+                }
+            save_gray(out, viz, W, H);
+            printf("wrote MRA representation %dx%d (levels=%d, %s) -> %s\n", W, H,
                    levels, fp16 ? "fp16" : "fp32", out);
         } else {
             std::vector<float> recon = crop_image(plane, W, img.w, img.h);
