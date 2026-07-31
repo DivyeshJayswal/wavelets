@@ -1,5 +1,6 @@
 // Item 8 validation: the extraction kernel must return exactly the pixels of the
 // requested level-L LL region as they sit in the resident MRA image.
+#include <cmath>
 #include <cstdio>
 #include <vector>
 

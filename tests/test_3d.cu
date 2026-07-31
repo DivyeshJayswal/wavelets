@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "wavelet3d.cuh"
+#include "wavelet_cpu.hpp"  // WAVELET_RECON_TOL
 
 static bool finite_all(const std::vector<float>& v) {
     for (float x : v) if (!std::isfinite(x)) return false;
