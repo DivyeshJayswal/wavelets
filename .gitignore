@@ -1,0 +1,5 @@
+build/
+wavelets_project.zip
+bench_results.md
+*.o
+*.obj
