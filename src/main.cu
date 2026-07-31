@@ -91,6 +91,12 @@ int main(int argc, char** argv) {
     try {
         Image img = load_gray(in);
         int W = pad_to(img.w, levels), H = pad_to(img.h, levels);
+        if ((std::min(W, H) >> (levels - 1)) < 8) {
+            fprintf(stderr,
+                    "error: --levels too high for image size after padding "
+                    "(deepest processed band must be at least 8 pixels wide/high)\n");
+            return 2;
+        }
         std::vector<float> plane = pad_image(img, W, H);
 
         if (fp16)
